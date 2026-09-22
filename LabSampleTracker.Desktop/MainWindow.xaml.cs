@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Media;
@@ -19,6 +20,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // So when working on desing, I can have it vissible but when running will be hidden to improve UX
+        if (!DesignerProperties.GetIsInDesignMode(this))
+        {
+            EditorPanel.Visibility = Visibility.Collapsed;
+        }
+
         SamplesGrid.ItemsSource = _samples;
         StatusCombo.ItemsSource = new[] { "Pending", "Processing" };
         StatusCombo.SelectedIndex = 0;
@@ -73,6 +81,15 @@ public partial class MainWindow : Window
         EditorHint.Text = "New samples are stored by the API and added to the end of the list.";
         EditorPanel.Visibility = Visibility.Visible;
         NameBox.Focus();
+    }
+
+    private void AddButton_DoubleClick(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            "Action Not implemented.",
+            "Add sample", 
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void ModifyButton_Click(object sender, RoutedEventArgs e)
@@ -133,7 +150,7 @@ public partial class MainWindow : Window
         await LoadSamplesAsync();
     }
 
-    private async void DeleteButton_Click(object sender, RoutedEventArgs e)
+    private void DeleteButton_Click(object sender, RoutedEventArgs e)
     {
         var selected = _samples.Where(sample => sample.IsSelected).ToList();
         if (selected.Count == 0)
@@ -157,15 +174,17 @@ public partial class MainWindow : Window
         {
             SetBusy(true);
             var ids = selected.Select(sample => sample.Id).ToList();
-            await _apiClient.DeleteAsync(ids);
+            //  await _apiClient.DeleteAsync(ids); // This is the async version
+            _apiClient.Delete(ids); // This is the sync version
 
             foreach (var row in selected)
             {
                 _samples.Remove(row);
             }
 
+            int openId;
             if (EditorPanel.Visibility == Visibility.Visible &&
-                int.TryParse(IdBox.Text, out var openId) &&
+                int.TryParse(IdBox.Text, out openId) &&
                 ids.Contains(openId))
             {
                 HideEditor();
@@ -190,11 +209,19 @@ public partial class MainWindow : Window
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryReadForm(out var id, out var name, out var status))
+        int id;
+        string name;
+        string status;
+        if (!TryReadForm(out id, out name, out status))
         {
             return;
         }
-
+// NEW: Way using out var variables
+        // if (!TryReadForm(out var id, out var name, out var status))
+        // {
+        //     return;
+        // }
+        // If is a new, then check if the given id is not alreayd present
         if (!_isEditing && _samples.Any(sample => sample.Id == id))
         {
             ShowStatus($"A sample with id {id} already exists.", isError: true);
@@ -354,7 +381,7 @@ public partial class MainWindow : Window
         GenerateButton.IsEnabled = !isBusy;
         SaveButton.IsEnabled = !isBusy;
         CancelButton.IsEnabled = !isBusy;
-        RefreshButton.IsEnabled = !isBusy && _refreshReady;
+        RefreshButton.IsEnabled = !isBusy && _refreshReady; // Only when not busy and the refresh is ready
 
         if (isBusy)
         {
