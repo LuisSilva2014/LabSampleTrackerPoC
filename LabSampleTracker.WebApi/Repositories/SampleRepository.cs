@@ -22,7 +22,21 @@ public class SampleRepository : ISampleRepository
     public IReadOnlyList<Sample> GetAll()
     {
         EnsureLoaded();
-        return _samples.Select(Copy).ToList();
+
+    // NEW_WAY_TAG: Implemeting select and copy for shorter code
+    //   return _samples.Select(Copy).ToList();
+
+
+
+        // Build a new list of copies. The caller can change a returned sample
+        // without changing the sample stored in _samples.
+        List<Sample> copies = new List<Sample>();
+        foreach (Sample sample in _samples)
+        {
+            copies.Add(Copy(sample));
+        }
+
+        return copies;
     }
 
     public Sample? GetById(int id)
@@ -103,8 +117,9 @@ public class SampleRepository : ISampleRepository
             throw new FileNotFoundException("The sample CSV file was not found.", _csvFilePath);
         }
 
-        // Line 1 is the header. Names in this file do not contain commas.
-        foreach (var line in File.ReadLines(_csvFilePath).Skip(1))
+ 
+        var lines = File.ReadLines(_csvFilePath).Skip(1); // Excluding the first line as it the header
+        foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line))
             {
@@ -112,11 +127,13 @@ public class SampleRepository : ISampleRepository
             }
 
             var parts = line.Split(',');
-            if (parts.Length != 3)
+            // Checking that the expected columns will exact 3 for now
+            if (parts.Length != 3) 
             {
                 throw new FormatException($"Each CSV line must be Id,Name,Status. Got: {line}");
             }
 
+            // Doing the mapping
             _samples.Add(new Sample
             {
                 Id = int.Parse(parts[0].Trim(), CultureInfo.InvariantCulture),
@@ -128,6 +145,10 @@ public class SampleRepository : ISampleRepository
         _hasLoadedFromCsv = true;
     }
 
+    /*
+     * It copies a sample to a new instance.
+     * This is done to avoid returning the internal list's references,
+     */
     private static Sample Copy(Sample sample)
     {
         return new Sample
